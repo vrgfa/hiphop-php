@@ -39,6 +39,9 @@ public:
   DECLARE_RESOURCE_ALLOCATION_NO_SWEEP(XmlDocWrapper)
 
   CLASSNAME_IS("xmlDoc");
+
+  Object m_element;
+
   // overriding ResourceData
   virtual const String& o_getClassNameHook() const { return classnameof(); }
 
@@ -284,9 +287,9 @@ Variant f_simplexml_import_dom(CObjRef node,
   }
 
   if (nodep && nodep->type == XML_ELEMENT_NODE) {
-    Resource obj =
-      Resource(NEWOBJ(XmlDocWrapper)(nodep->doc, class_name, node));
-    return create_element(nullptr, obj, nodep, String(), false);
+    XmlDocWrapper *obj = NEWOBJ(XmlDocWrapper)(nodep->doc, class_name, node);
+    obj->m_element = create_element(nullptr, Resource(obj), nodep, String(), false);
+    return obj->m_element;
   } else {
     raise_warning("Invalid Nodetype to import");
     return uninit_null();
@@ -323,9 +326,9 @@ Variant f_simplexml_load_string(const String& data,
     return false;
   }
 
-  return create_element(nullptr,
-                        Resource(NEWOBJ(XmlDocWrapper)(doc, cls->nameRef())),
-                        root, ns, is_prefix);
+  XmlDocWrapper *obj = NEWOBJ(XmlDocWrapper)(doc, cls->nameRef());
+  obj->m_element = create_element(nullptr, Resource(obj), root, ns, is_prefix);
+  return obj->m_element;
 }
 
 Variant f_simplexml_load_file(const String& filename,
@@ -398,9 +401,9 @@ void c_SimpleXMLElement::t___construct(const String& data, int64_t options /* = 
   xmlDocPtr doc = xmlReadMemory(xml.data(), xml.size(),
                                 nullptr, nullptr, options);
   if (doc) {
-    m_root = this;
-    m_doc =
-      Resource(NEWOBJ(XmlDocWrapper)(doc, o_getClassName()));
+    XmlDocWrapper *obj = NEWOBJ(XmlDocWrapper)(doc, o_getClassName());
+    obj->m_element = m_root = this;
+    m_doc = Resource(obj);
     m_node = xmlDocGetRootElement(doc);
     if (m_node) {
       m_children = create_children(m_root, m_doc, m_node, ns, is_prefix);
