@@ -184,8 +184,7 @@ static Array create_children(c_SimpleXMLElement *root,
                              const String& ns, bool is_prefix) {
   Array properties = Array::Create();
   for (xmlNodePtr node = parent->children; node; node = node->next) {
-    if (parent->parent && parent->parent->type == XML_DOCUMENT_NODE &&
-        node->type == XML_COMMENT_NODE) continue;
+    if (node->type == XML_COMMENT_NODE) continue;
     if (node->children || node->prev || node->next) {
       if (node->type == XML_TEXT_NODE) {
         // bad node from parser, ignoring it...
