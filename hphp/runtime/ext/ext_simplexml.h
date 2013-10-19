@@ -45,6 +45,7 @@ typedef enum {
 
 FORWARD_DECLARE_CLASS(SimpleXMLElementIterator);
 FORWARD_DECLARE_CLASS(SimpleXMLElement);
+
 class c_SimpleXMLElementIterator : public ExtObjectData, public Sweepable {
  public:
   DECLARE_CLASS(SimpleXMLElementIterator)
@@ -59,14 +60,8 @@ class c_SimpleXMLElementIterator : public ExtObjectData, public Sweepable {
   public: Variant t_valid();
 
 public:
-  xmlChar  *name;
-  xmlChar  *nsprefix;
-  int      isprefix;
-  SXE_ITER type;
   c_SimpleXMLElement *sxe;
-  c_SimpleXMLElement *data;
 };
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // SimpleXMLElement
@@ -82,7 +77,6 @@ class c_SimpleXMLElement :
  public:
   DECLARE_CLASS(SimpleXMLElement)
 
-  // need to implement
   public: c_SimpleXMLElement(Class* cls = c_SimpleXMLElement::classof());
   public: ~c_SimpleXMLElement();
   public: void t___construct(const String& data, int64_t options = 0, bool data_is_url = false, const String& ns = "", bool is_prefix = false);
@@ -117,7 +111,13 @@ class c_SimpleXMLElement :
 
   xmlDocPtr document;
   xmlNodePtr node;
-  c_SimpleXMLElementIterator iter;
+  struct {
+    xmlChar  *name;
+    xmlChar  *nsprefix;
+    int      isprefix;
+    SXE_ITER type;
+    c_SimpleXMLElement *data;
+  } iter;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

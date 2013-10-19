@@ -50,6 +50,7 @@ static c_SimpleXMLElement *_node_as_zval(c_SimpleXMLElement *sxe, xmlNodePtr nod
     subnode->iter.isprefix = isprefix;
   }
   subnode->node = node; 
+  obj->incRefCount();
   return subnode;
 }
 
@@ -121,7 +122,7 @@ static xmlNodePtr php_sxe_reset_iterator(c_SimpleXMLElement *sxe, int use_data) 
         node = node->children;
         break;
       case SXE_ITER_ATTRLIST:
-        node = (xmlNodePtr) node->properties;
+        node = (xmlNodePtr)node->properties;
     }
     return php_sxe_iterator_fetch(sxe, node, use_data);
   }
@@ -291,6 +292,70 @@ bool c_SimpleXMLElement::t_registerxpathnamespace(const String& prefix, const St
 }
 
 Variant c_SimpleXMLElement::t_asxml(const String& filename /* = "" */) {
+  xmlOutputBufferPtr  outbuf;
+
+  if (filename.size()) {
+    xmlNodePtr node = php_sxe_get_first_node(this);
+
+    if (node) {
+      if (node->parent && (XML_DOCUMENT_NODE == node->parent->type)) {
+        int bytes;
+        bytes = xmlSaveFile(filename.data(), document);
+        if (bytes == -1) {
+          return false;
+        } else {
+          return true;
+        }
+      } else {
+        outbuf = xmlOutputBufferCreateFilename(filename.data(), NULL, 0);
+
+        if (outbuf == NULL) {
+          return false;
+        }
+
+        xmlNodeDumpOutput(outbuf, document, node, 0, 0, NULL);
+        xmlOutputBufferClose(outbuf);
+        return true;
+      }
+    } else {
+      return false;
+    }
+  }
+
+  xmlNodePtr node = php_sxe_get_first_node(this);
+
+  if (node) {
+    if (node->parent && (XML_DOCUMENT_NODE == node->parent->type)) {
+      xmlChar *strval;
+      int      strval_len;
+      xmlDocDumpMemoryEnc(document, &strval, &strval_len, (const char*)document->encoding);
+      String ret = String((char*)strval);
+      xmlFree(strval);
+      return ret;
+    } else {
+      /* Should we be passing encoding information instead of NULL? */
+      outbuf = xmlAllocOutputBuffer(NULL);
+
+      if (outbuf == NULL) {
+        return false;
+      }
+
+      xmlNodeDumpOutput(outbuf, document, node, 0, 0, (const char*)document->encoding);
+      xmlOutputBufferFlush(outbuf);
+
+      char *str = nullptr; 
+#ifdef LIBXML2_NEW_BUFFER
+      str = (char *)xmlOutputBufferGetContent(outbuf);
+#else
+      str = (char *)outbuf->buffer->content;
+#endif
+      String ret = String(str);
+      xmlOutputBufferClose(outbuf);
+      return ret;
+    }
+  } else {
+    return false;
+  }
   return false;
 }
 
@@ -389,9 +454,10 @@ Array c_SimpleXMLElement::ToArray(const ObjectData* obj) {
 }
 
 Variant c_SimpleXMLElement::t_getiterator() {
-  php_sxe_reset_iterator(this, 1);
-  iter.sxe = this;
-  return Object(&iter);
+  Object obj = create_object(c_SimpleXMLElementIterator::classof()->nameRef(), Array(), false);
+  c_SimpleXMLElementIterator *iter = obj.getTyped<c_SimpleXMLElementIterator>();
+  iter->sxe = this;
+  return obj;
 }
 
 int64_t c_SimpleXMLElement::t_count() {
@@ -419,8 +485,7 @@ void c_SimpleXMLElement::t_offsetunset(CVarRef index) {
 // Iterator
 
 c_SimpleXMLElementIterator::c_SimpleXMLElementIterator(Class* cb) :
-    ExtObjectData(cb), name(nullptr), nsprefix(nullptr), isprefix(false),
-    type(SXE_ITER_NONE) {
+    ExtObjectData(cb), sxe(nullptr) {
 }
 
 c_SimpleXMLElementIterator::~c_SimpleXMLElementIterator() {
@@ -433,9 +498,7 @@ void c_SimpleXMLElementIterator::t___construct() {
 }
 
 Variant c_SimpleXMLElementIterator::t_current() {
-  // TODO:
-  // return Object(data);
-  return false;
+  return Object(sxe->iter.data);
 }
 
 Variant c_SimpleXMLElementIterator::t_key() {
@@ -448,7 +511,7 @@ Variant c_SimpleXMLElementIterator::t_next() {
 }
 
 Variant c_SimpleXMLElementIterator::t_rewind() {
-  php_sxe_reset_iterator(sxe);
+  php_sxe_reset_iterator(sxe, 1);
   return uninit_null();
 }
 
